@@ -11,7 +11,7 @@
 #include <chrono>
 #include <thread>
 
-#include <httpserver.hpp>
+#include <drogon/HttpAppFramework.h>
 #include "common.h"
 #include "settings.h"
 #include "MultiSync.h"
@@ -37,8 +37,70 @@ enum {
     BLANK             = 9
 };
 
-class LoRaMultiSyncPlugin : public MultiSyncPlugin, public httpserver::http_resource  {
+class LoRaMultiSyncPlugin : public MultiSyncPlugin {
 public:
+    void registerApis() {
+        auto handleLoRa = [this](const drogon::HttpRequestPtr& req,
+                                 std::function<void (const drogon::HttpResponsePtr &)> &&callback) {
+            bool reopen = false;
+            if (devFile >= 0) {
+                SerialClose(devFile);
+                devFile = -1;
+                reopen = true;
+            }
+            Json::Value json;
+            std::string content = req->bodyData();
+            LoadJsonFromString(content, json);
+            std::string modType = json["LoRaDeviceType"].asString();
+            if (!startsWith(modType, "Waveshare")) {
+                device = json["LoRaDevicePort"].asString();
+                int MA = json["MA"].asInt();
+                int UBR = json["UBR"].asInt();
+                int ADR = json["ADR"].asInt();
+                int FEC = json["FEC"].asInt();
+                int TXP = json["TXP"].asInt();
+                float CH = json["CH"].asFloat();
+                std::string devFileName = "/dev/" + device;
+                int sdevFile = SerialOpen(devFileName.c_str(), 9600, "8N1", true);
+                char buf[256];
+                memset(buf, 0, sizeof(buf));
+                int packetLen;
+                setupQuery(buf, modType, packetLen);
+                int w = sendCommand(sdevFile, buf, 3, packetLen);
+                printBuf(buf, "C1", w);
+                setupPacket(buf, modType);
+                addMA(MA, buf, modType);
+                addUBR(UBR, buf, modType);
+                addADR(ADR, buf, modType);
+                addCH(CH, buf, modType);
+                addFLAGS(FEC, TXP, buf, modType);
+                printBuf(buf, "C0S", packetLen);
+                w = sendCommand(sdevFile, buf, packetLen, packetLen);
+                printBuf(buf, "C0E", w);
+                if (w == 0) {
+                    w = sendCommand(sdevFile, buf, packetLen, packetLen);
+                    printBuf(buf, "C0E", w);
+                }
+                memset(buf, 0, sizeof(buf));
+                setupQuery(buf, modType, packetLen);
+                w = sendCommand(sdevFile, buf, 3, packetLen);
+                printBuf(buf, "C1E", w);
+                SerialClose(sdevFile);
+                LogInfo(VB_PLUGIN, "LoRa Module Configured\n", devFileName.c_str());
+            }
+            loadSettings();
+            if (reopen) {
+                Init();
+            }
+            auto resp = drogon::HttpResponse::newHttpResponse();
+            resp->setStatusCode(drogon::k200OK);
+            resp->setContentTypeString("text/plain");
+            resp->setBody("OK");
+            callback(resp);
+        };
+        drogon::app().registerHandler("/LoRa", handleLoRa, {drogon::Post});
+        drogon::app().registerHandler("/api/plugin-apis/LoRa", handleLoRa, {drogon::Post});
+    }
     
     LoRaMultiSyncPlugin() {}
     virtual ~LoRaMultiSyncPlugin() {
@@ -237,71 +299,7 @@ public:
         return total;
     }
 
-    virtual HTTP_RESPONSE_CONST std::shared_ptr<httpserver::http_response> render_POST(const httpserver::http_request &req) override {
-        bool reopen = false;
-        if (devFile >= 0) {
-            SerialClose(devFile);
-            devFile = -1;
-            reopen = true;
-        }        
-        Json::Value json;
-        std::string content(req.get_content());
-        LoadJsonFromString(content, json);
-        std::string modType = json["LoRaDeviceType"].asString();
-
-        if (!startsWith(modType, "Waveshare")) {
-            device = json["LoRaDevicePort"].asString();
-            int MA = json["MA"].asInt();
-            int UBR = json["UBR"].asInt();
-            int ADR = json["ADR"].asInt();
-            int FEC = json["FEC"].asInt();
-            int TXP = json["TXP"].asInt();
-            float CH = json["CH"].asFloat();
-
-            
-            std::string devFileName = "/dev/" + device;
-            int sdevFile = SerialOpen(devFileName.c_str(), 9600, "8N1", true);
-
-            char buf[256];
-            memset(buf, 0, sizeof(buf));
-            int packetLen;
-            setupQuery(buf, modType, packetLen);        
-            int w = sendCommand(sdevFile, buf, 3, packetLen);
-            printBuf(buf, "C1", w);
-
-            setupPacket(buf, modType);
-            addMA(MA, buf, modType);
-            addUBR(UBR, buf, modType);
-            addADR(ADR, buf, modType);
-            addCH(CH, buf, modType);
-            addFLAGS(FEC, TXP, buf, modType);
-            printBuf(buf, "C0S", packetLen);
-            w = sendCommand(sdevFile, buf, packetLen, packetLen);
-            printBuf(buf, "C0E", w);
-            if (w == 0) {
-                w = sendCommand(sdevFile, buf, packetLen, packetLen);
-                printBuf(buf, "C0E", w);    
-            }
-            
-            memset(buf, 0, sizeof(buf));
-            setupQuery(buf, modType, packetLen);        
-            w = sendCommand(sdevFile, buf, 3, packetLen);
-            printBuf(buf, "C1E", w);
-
-            SerialClose(sdevFile);
-            LogInfo(VB_PLUGIN, "LoRa Module Configured\n", devFileName.c_str());
-        }
-        loadSettings();
-        if (reopen) {
-            Init();
-        }
-        
-#if FPP_MAJOR_VERSION >= 4
-        return std::shared_ptr<httpserver::http_response>(new httpserver::string_response("OK", 200));
-#else
-        return httpserver::http_response_builder("OK", 200);
-#endif
-    }
+    // drogon handler will be used instead of render_POST
     void writeWS(const char *buf, bool resp = true) {
         if (devFile >= 0) {
             write(devFile, buf, strlen(buf));
@@ -726,25 +724,8 @@ public:
         plugin = nullptr;
     }
     
-    virtual void registerApis(httpserver::webserver *m_ws) override {
-        //at this point, most of FPP is up and running, we can register our MultiSync plugin
-        if (enabled && plugin->Init()) {
-            if (getFPPmode() == PLAYER_MODE) {
-                //only register the sender for master mode
-                multiSync->addMultiSyncPlugin(plugin);
-            }
-        } else {
-            enabled = false;
-        }
-        m_ws->register_resource("/LoRa", plugin, true);
-        
-    }
-    virtual void unregisterApis(httpserver::webserver* m_ws) override {
-        m_ws->unregister_resource("/LoRa");
-        if (enabled) {
-            plugin->ShutdownSync();
-            multiSync->removeMultiSyncPlugin(plugin);
-        }
+    void registerApis() override {
+        plugin->registerApis();
     }
 
     virtual void addControlCallbacks(std::map<int, std::function<bool(int)>> &callbacks) override {

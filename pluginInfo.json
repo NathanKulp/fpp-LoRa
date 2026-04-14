@@ -1,44 +1,47 @@
 {
-	"repoName": "fpp-LoRa",
-	"name": "LoRa MultiSync Plugin for FPP",
-	"author": "Daniel Kulp (dkulp)",
-	"description": "This plugin extends the Master/Remote protocol of FPP to use LoRa serial/uart devices.  This can provide Master/Remote setups that span miles, far outside the range of Wifi.",
-	"homeURL": "https://github.com/FalconChristmas/fpp-LoRa",
-	"srcURL": "https://github.com/FalconChristmas/fpp-LoRa.git",
-	"bugURL": "https://github.com/FalconChristmas/fpp-LoRa/issues",
-	"allowUpdates": 1,
-	"versions": [
-		{
-			"minFPPVersion": "3.1",
-			"maxFPPVersion": "0",
-			"branch": "master",
-			"sha": "2d56758d02688acaf8af0b8ad95f409be79b283a",
-			"dependencies": {
-			}
-		},
+    "repoName": "fpp-LoRa",
+    "name": "LoRa MultiSync Plugin for FPP",
+    "author": "Daniel Kulp (dkulp)",
+    "description": "This plugin extends the Master/Remote protocol of FPP to use LoRa serial/uart devices.  This can provide Master/Remote setups that span miles, far outside the range of Wifi.",
+    "homeURL": "https://github.com/FalconChristmas/fpp-LoRa",
+    "srcURL": "https://github.com/FalconChristmas/fpp-LoRa.git",
+    "bugURL": "https://github.com/FalconChristmas/fpp-LoRa/issues",
+    "allowUpdates": 1,
+    "versions": [
+        {
+            "minFPPVersion": "3.1",
+            "maxFPPVersion": "0",
+            "branch": "master",
+            "sha": "2d56758d02688acaf8af0b8ad95f409be79b283a",
+            "dependencies": {}
+        },
         {
             "minFPPVersion": "6.0",
             "maxFPPVersion": "7.99",
             "branch": "master",
             "sha": "c09456dda783813c37036443e88f77c905e57aec",
-            "dependencies": {
-            }
+            "dependencies": {}
         },
         {
             "minFPPVersion": "8.0",
             "maxFPPVersion": "0",
             "branch": "master",
             "sha": "",
-            "dependencies": {
-            }
+            "dependencies": {}
         },
         {
             "minFPPVersion": "9.0",
+            "maxFPPVersion": "9.99",
+            "branch": "master",
+            "sha": "f2222b9fbb0ed4b0ec5ccafafbac6052b939effa",
+            "dependencies": {}
+        },
+        {
+            "minFPPVersion": "10.0",
             "maxFPPVersion": "0",
             "branch": "master",
             "sha": "",
-            "dependencies": {
-            }
+            "dependencies": {}
         }
-	]
+    ]
 }
