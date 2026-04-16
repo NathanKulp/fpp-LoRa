@@ -40,8 +40,10 @@ enum {
 class LoRaMultiSyncPlugin : public MultiSyncPlugin {
 public:
     void registerApis() {
-        auto handleLoRa = [this](const drogon::HttpRequestPtr& req,
-                                 std::function<void (const drogon::HttpResponsePtr &)> &&callback) {
+        // Wrap the handler in a shared_ptr so we can use it in multiple registerHandler calls
+        auto handleLoRaPtr = std::make_shared<std::function<void(const drogon::HttpRequestPtr&, std::function<void(const drogon::HttpResponsePtr&)>&&)>>();
+        *handleLoRaPtr = [this](const drogon::HttpRequestPtr& req,
+                                std::function<void (const drogon::HttpResponsePtr &)> &&callback) {
             bool reopen = false;
             if (devFile >= 0) {
                 SerialClose(devFile);
@@ -98,8 +100,17 @@ public:
             resp->setBody("OK");
             callback(resp);
         };
-        drogon::app().registerHandler("/LoRa", handleLoRa, {drogon::Post});
-        drogon::app().registerHandler("/api/plugin-apis/LoRa", handleLoRa, {drogon::Post});
+        // Use capturing lambdas to copy the shared_ptr for each registration
+        drogon::app().registerHandler("/LoRa",
+            [handleLoRaPtr](const drogon::HttpRequestPtr& req, std::function<void(const drogon::HttpResponsePtr&)>&& cb) {
+                (*handleLoRaPtr)(req, std::move(cb));
+            },
+            {drogon::Post});
+        drogon::app().registerHandler("/api/plugin-apis/LoRa",
+            [handleLoRaPtr](const drogon::HttpRequestPtr& req, std::function<void(const drogon::HttpResponsePtr&)>&& cb) {
+                (*handleLoRaPtr)(req, std::move(cb));
+            },
+            {drogon::Post});
     }
     
     LoRaMultiSyncPlugin() {}
